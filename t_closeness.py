@@ -1,5 +1,18 @@
 import numpy as np
 import math
+import pandas as pd
+
+def main():
+    data = pd.read_csv("Lab2.csv")
+    data.head()
+    t = EMD_ordered_distance(data, ['Gender', 'Age', 'Marital_Status', 'Country_Birth', 'Race'], ['Household_Income'])
+    print(t)
+    t = divergence(data, ['Gender', 'Age', 'Marital_Status', 'Country_Birth', 'Race'], ['Household_Income'])
+    print(t)
+    t = pearson(data, ['Gender', 'Age', 'Marital_Status', 'Country_Birth', 'Race'], ['Household_Income'])
+    print(t)
+    t = sjsd(data, ['Gender', 'Age', 'Marital_Status', 'Country_Birth', 'Race'], ['Household_Income'])
+    print(t)
 
 def normalize(d, target=1.0):
     """ Normalizes a distribution. """
@@ -19,6 +32,7 @@ def computeSensitiveAttrs(data_table, quasi_identifier, sensitive_column):
             pass
         else:
             sensitives.append(i[-2])
+    sensitives.sort()
     return sensitives
 
 def constructP(data_table, quasi_identifier, sensitive_column):
@@ -34,10 +48,10 @@ def constructP(data_table, quasi_identifier, sensitive_column):
             prior[i[-2]] = i[-1]
 
     prior = normalize(prior)
-    return prior
+    return prior, eq_class
 
-def constructAllQs(data_table, quasi_identifier, sensitive_column, sensitiveAttributes):
-    """ Constructs the Q distribution. """
+def constructAllQs(data_table, quasi_identifier, sensitive_column, sensitives, eq_class, prior):
+    """ Constructs the Q distributions. """
 
     eq_class_2, freq = np.unique(data_table[quasi_identifier], return_counts=True, axis=0)
     eq_class_2 = np.append(eq_class_2, [[f] for f in freq], axis=1)
@@ -60,13 +74,13 @@ def constructAllQs(data_table, quasi_identifier, sensitive_column, sensitiveAttr
                 post[j[-2]] += j[-1]
 
         post = normalize(post)
-        post.append(post)
+        postList.append(post)
     return postList
 
 def EMD_ordered_distance(data_table, quasi_identifier, sensitive_column):
-        p = constructP(data_table, quasi_identifier, sensitive_column)
-        sensitives = computeSensitiveAttr(data_table, quasi_identifier, sensitive_column)
-        qList = constructAllQs(data_table, quasi_identifier, sensitive_column, sensitives)
+        p, eq_class = constructP(data_table, quasi_identifier, sensitive_column)
+        sensitives = computeSensitiveAttrs(data_table, quasi_identifier, sensitive_column)
+        qList = constructAllQs(data_table, quasi_identifier, sensitive_column, sensitives, eq_class, p)
 
         t_values = []
         maxT = 0
@@ -82,16 +96,14 @@ def EMD_ordered_distance(data_table, quasi_identifier, sensitive_column):
                 totalSum += abs(c)
 
             t = totalSum / (len(sensitives) - 1)
-            maxT = max(t, minT)
+            maxT = max(t, maxT)
             t_values.append(t)
-
-    eq_class_final = np.append(eq_class, [[t] for t in t_values], axis=1)
-    return maxT, eq_class_final
+        return maxT
 
 def divergence(data_table, quasi_identifier, sensitive_column):
-    p = constructP(data_table, quasi_identifier, sensitive_column)
-    sensitives = computeSensitiveAttr(data_table, quasi_identifier, sensitive_column)
-    qList = constructAllQs(data_table, quasi_identifier, sensitive_column, sensitives)
+    p, eq_class = constructP(data_table, quasi_identifier, sensitive_column)
+    sensitives = computeSensitiveAttrs(data_table, quasi_identifier, sensitive_column)
+    qList = constructAllQs(data_table, quasi_identifier, sensitive_column, sensitives, eq_class, p)
 
     t_values = []
     maxT = 0
@@ -100,20 +112,20 @@ def divergence(data_table, quasi_identifier, sensitive_column):
         t_value = 0
 
         for s in sensitives:
-            val = ((p[s] - q[s])**2) / ((p[s] + q[s])**2)
-            t_value += val
+            if q[s] > 0 and p[s] > 0 and q[s] < 1 and p[s] < 1: 
+                val = ((p[s] - q[s])**2) / ((p[s] + q[s])**2)
+                t_value += val
 
         t_values.append(t_value)
 
         maxT = max(t_value, maxT)
 
-    eq_class_final = np.append(eq_class, [[t] for t in t_values], axis=1)
-    return maxT, eq_class_final
+    return maxT
 
 def pearson(data_table, quasi_identifier, sensitive_column):
-    p = constructP(data_table, quasi_identifier, sensitive_column)
-    sensitives = computeSensitiveAttr(data_table, quasi_identifier, sensitive_column)
-    qList = constructAllQs(data_table, quasi_identifier, sensitive_column, sensitives)
+    p, eq_class = constructP(data_table, quasi_identifier, sensitive_column)
+    sensitives = computeSensitiveAttrs(data_table, quasi_identifier, sensitive_column)
+    qList = constructAllQs(data_table, quasi_identifier, sensitive_column, sensitives, eq_class, p)
 
     t_values = []
     maxT = 0
@@ -122,20 +134,20 @@ def pearson(data_table, quasi_identifier, sensitive_column):
         t_value = 0
 
         for s in sensitives:
-            val = ((p[s] - q[s])**2) / q[s]
-            t_value += val
+            if q[s] > 0 and p[s] > 0 and q[s] < 1 and p[s] < 1: 
+                val = ((p[s] - q[s])**2) / q[s]
+                t_value += val
 
         t_values.append(t_value)
 
         maxT = max(t_value, maxT)
 
-    eq_class_final = np.append(eq_class, [[t] for t in t_values], axis=1)
-    return maxT, eq_class_final
+    return maxT
 
 def sjsd(data_table, quasi_identifier, sensitive_column):
-    p = constructP(data_table, quasi_identifier, sensitive_column)
-    sensitives = computeSensitiveAttr(data_table, quasi_identifier, sensitive_column)
-    qList = constructAllQs(data_table, quasi_identifier, sensitive_column, sensitives)
+    p, eq_class = constructP(data_table, quasi_identifier, sensitive_column)
+    sensitives = computeSensitiveAttrs(data_table, quasi_identifier, sensitive_column)
+    qList = constructAllQs(data_table, quasi_identifier, sensitive_column, sensitives, eq_class, p)
 
     t_values = []
     maxT = 0
@@ -144,14 +156,17 @@ def sjsd(data_table, quasi_identifier, sensitive_column):
         t_value = 0
 
         for s in sensitives:
-            t_value += p[s] * math.log(2, (2*p[s])/(p[s] + q[s]))
-            t_value += q[s] * math.log(2, (2*q[s])/(p[s] + q[s]))
-            t_value = t_value / 2
-            t_value = math.sqrt(t_value)
+            if q[s] > 0 and p[s] > 0 and q[s] < 1 and p[s] < 1: 
+                t_value += p[s] * math.log(2, (2*p[s])/(p[s] + q[s]))
+                t_value += q[s] * math.log(2, (2*q[s])/(p[s] + q[s]))
+        t_value = t_value / 2
+        t_value = math.sqrt(t_value)        
 
         t_values.append(t_value)
 
         maxT = max(t_value, maxT)
 
-    eq_class_final = np.append(eq_class, [[t] for t in t_values], axis=1)
-    return maxT, eq_class_final
+    return maxT
+
+if __name__ == "__main__":
+    main()
