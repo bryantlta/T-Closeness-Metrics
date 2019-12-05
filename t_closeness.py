@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import pandas as pd
+import matplotlib.pyplot as plt 
 
 def main():
     data = pd.read_csv("Lab2.csv")
@@ -12,6 +13,14 @@ def main():
     t = pearson(data, ['Gender', 'Age', 'Marital_Status', 'Country_Birth', 'Race'], ['Household_Income'])
     print(t)
     t = sjsd(data, ['Gender', 'Age', 'Marital_Status', 'Country_Birth', 'Race'], ['Household_Income'])
+    print(t)
+    t = bhattacharyya(data, ['Gender', 'Age', 'Marital_Status', 'Country_Birth', 'Race'], ['Household_Income'])
+    print(t)
+    t = hellinger(data, ['Gender', 'Age', 'Marital_Status', 'Country_Birth', 'Race'], ['Household_Income'])
+    print(t)
+    t = klDivergence(data, ['Gender', 'Age', 'Marital_Status', 'Country_Birth', 'Race'], ['Household_Income'])
+    print(t)
+    t = totalVariationDistance(data, ['Gender', 'Age', 'Marital_Status', 'Country_Birth', 'Race'], ['Household_Income'])
     print(t)
 
 def normalize(d, target=1.0):
@@ -167,6 +176,124 @@ def sjsd(data_table, quasi_identifier, sensitive_column):
         maxT = max(t_value, maxT)
 
     return maxT
+
+def bhattacharyya(data_table, quasi_identifier, sensitive_column):
+    p, eq_class = constructP(data_table, quasi_identifier, sensitive_column)
+    sensitives = computeSensitiveAttrs(data_table, quasi_identifier, sensitive_column)
+    qList = constructAllQs(data_table, quasi_identifier, sensitive_column, sensitives, eq_class, p)
+
+    t_values = []
+    maxT = 0
+
+    for q in qList:
+        t_value = 0
+
+        for s in sensitives:
+            t_value += math.sqrt(p[s] * q[s])
+
+        t_value = math.log(t_value) * -1
+    
+        t_values.append(t_value)
+
+        maxT = max(t_value, maxT)
+
+    return maxT
+
+def hellinger(data_table, quasi_identifier, sensitive_column):
+    p, eq_class = constructP(data_table, quasi_identifier, sensitive_column)
+    sensitives = computeSensitiveAttrs(data_table, quasi_identifier, sensitive_column)
+    qList = constructAllQs(data_table, quasi_identifier, sensitive_column, sensitives, eq_class, p)
+
+    t_values = []
+    maxT = 0
+
+    for q in qList:
+        t_value = 0
+
+        for s in sensitives:
+            t_value = (math.sqrt(p[s]) - math.sqrt(q[s])) ** 2
+            
+            t_value = math.sqrt(t_value) * 1 / math.sqrt(2)
+
+            t_values.append(t_value)
+
+            maxT = max(t_value, maxT)
+
+        return maxT
+
+def klDivergence(data_table, quasi_identifier, sensitive_column):
+    p, eq_class = constructP(data_table, quasi_identifier, sensitive_column)
+    sensitives = computeSensitiveAttrs(data_table, quasi_identifier, sensitive_column)
+    qList = constructAllQs(data_table, quasi_identifier, sensitive_column, sensitives, eq_class, p)
+
+    t_values = []
+    maxT = 0
+
+    for q in qList:
+        t_value = 0
+
+        for s in sensitives:
+            if q[s] > 0:
+                t_value = p[s] * math.log(p[s] / q[s])
+
+        t_values.append(t_value)
+
+        maxT = max(t_value, maxT)
+
+    return maxT
+
+def totalVariationDistance(data_table, quasi_identifier, sensitive_column):
+    p, eq_class = constructP(data_table, quasi_identifier, sensitive_column)
+    sensitives = computeSensitiveAttrs(data_table, quasi_identifier, sensitive_column)
+    qList = constructAllQs(data_table, quasi_identifier, sensitive_column, sensitives, eq_class, p)
+
+    t_values = []
+    maxT = 0
+
+    for q in qList:
+        t_value = 0
+
+        for s in sensitives:
+            t_value = abs(p[s] - q[s])
+
+        t_value = t_value / 2
+        t_values.append(t_value)
+
+        maxT = max(t_value, maxT)
+
+    return maxT
+
+
+
+
+def incognitoAlgorithm(distance_metric):
+    return distance_metric ** distance_metric
+    #raise NotImplementedError
+
+
+    
+
+def testTCloseness(metric_name):
+    # Pass in different t values into incognito. 
+
+    tValues = [i/10 for i in range(100)]
+    informationGain = [incognitoAlgorithm(tValues[i]) for i in range(100)]
+
+    plt.plot(tValues, informationGain) 
+    plt.xlabel('T-Value') 
+    plt.ylabel('Information Loss')
+    plt.title('{}'.format(metric_name))
+
+    plt.show() 
+
+    #raise NotImplementedError
+
+def newMain():
+    for metric in list_of_metrics:
+        testTCloseness(metric_name)
+    
+    raise NotImplementedError
+
 
 if __name__ == "__main__":
     main()
